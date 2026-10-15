@@ -337,6 +337,9 @@ export default function HomePage() {
 
           // 내 주변 3km 이내 맛집 우선 표시 (원클릭 반경 변경 가능)
           setSelectedRadius(3000);
+          setSearchQuery("");
+          setMapFocusTrigger((prev) => prev + 1);
+          fetchPublicData(coords.lat, coords.lng, 3000);
         },
         (error) => {
           // 1차 고정밀 실패 시, 2차 일반 정밀도로 1회 자동 재시도 (데스크톱/노트북 타임아웃 방지)
@@ -505,37 +508,6 @@ export default function HomePage() {
     setSearchQuery("");
   }, []);
 
-  // 검색창 엔터(Enter) 클릭 / 제출 시 전국 모든 지역, 동네, 지하철역, 명소 자동 인식 및 실시간 탐색
-  const handleSearchSubmit = useCallback(
-    async (rawQuery?: string) => {
-      const q = (rawQuery !== undefined ? rawQuery : searchQuery).trim();
-      if (!q) return;
-
-      setSearchQuery(q);
-
-      // 카카오 지도 Geocoder / Places + 전국 17개 시도 동네 DB + 지하철역 통합 지오코딩
-      const resolved = await resolveKakaoLocation(q);
-
-      if (resolved) {
-        setSelectedLocation({
-          title: resolved.title,
-          fullName: resolved.fullName,
-          lat: resolved.lat,
-          lng: resolved.lng,
-          description: resolved.description,
-        });
-        setLocationMode("manual_region");
-        setFocusedMapRestaurantId(null);
-        setSelectedRadius("all");
-        return;
-      }
-
-      // 일반 음식점명/메뉴 검색: 전체 반경에서 검색어 필터 유지
-      setSelectedRadius("all");
-    },
-    [searchQuery]
-  );
-
   // 공공데이터 실데이터 조회 (선택한 동네/좌표 반경 전국 상가 등록 음식점 최대 50건 조회)
   const fetchPublicData = useCallback(
     async (lat: number, lng: number, radiusMeters: number = 3000) => {
@@ -568,6 +540,39 @@ export default function HomePage() {
       }
     },
     [fetchRestaurants]
+  );
+
+  // 검색창 엔터(Enter) 클릭 / 제출 시 전국 모든 지역, 동네, 지하철역, 명소 자동 인식 및 실시간 탐색
+  const handleSearchSubmit = useCallback(
+    async (rawQuery?: string) => {
+      const q = (rawQuery !== undefined ? rawQuery : searchQuery).trim();
+      if (!q) return;
+
+      // 카카오 지도 Geocoder / Places + 전국 17개 시도 동네 DB + 지하철역 통합 지오코딩
+      const resolved = await resolveKakaoLocation(q);
+
+      if (resolved) {
+        setSelectedLocation({
+          title: resolved.title,
+          fullName: resolved.fullName,
+          lat: resolved.lat,
+          lng: resolved.lng,
+          description: resolved.description,
+        });
+        setLocationMode("manual_region");
+        setFocusedMapRestaurantId(null);
+        setSelectedRadius(3000); // 3km 반경으로 주변 맛집 탐색 활성화
+        setSearchQuery(""); // 중요: 지역명 매칭 시 검색어 필터를 비워 해당 동네 전체 맛집이 거리순으로 정렬되도록 함
+        setMapFocusTrigger((prev) => prev + 1); // 지도 중심 이동 트리거
+        fetchPublicData(resolved.lat, resolved.lng, 3000); // 해당 지역 공공데이터 상가 50건 즉시 조회
+        return;
+      }
+
+      // 일반 음식점명/메뉴 검색: 전체 반경에서 검색어 필터 유지
+      setSearchQuery(q);
+      setSelectedRadius("all");
+    },
+    [searchQuery, fetchPublicData]
   );
 
   useEffect(() => {

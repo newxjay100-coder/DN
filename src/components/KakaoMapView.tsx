@@ -224,6 +224,9 @@ export default function KakaoMapView({
       centerCoords.lng
     );
 
+    // 중요: 신규 중심 좌표(GPS 또는 검색 지역)로 카카오 지도 화면 즉시 부드럽게 이동
+    map.panTo(centerLatLng);
+
     if (centerOverlayRef.current) {
       centerOverlayRef.current.setMap(null);
       centerOverlayRef.current = null;
