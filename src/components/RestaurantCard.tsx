@@ -226,7 +226,7 @@ export default function RestaurantCard({
               </span>
             </p>
 
-            {/* 3행: 망고플레이트 스타일 조회수 / 리뷰수 (예: "👁 272,139 / 265") */}
+            {/* 3행: 망고플레이트 스타일 조회수 / 리뷰수 및 카카오 길찾기 */}
             <div className="pt-1 flex items-center justify-between text-[11px] text-slate-400 font-medium">
               <span className="flex items-center gap-1">
                 <Eye className="w-3 h-3 text-slate-400" />
@@ -236,18 +236,34 @@ export default function RestaurantCard({
                 <span>{reviewCount.toLocaleString()}</span>
               </span>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveToMapMarker(restaurant);
-                }}
-                className="text-[11px] font-bold text-slate-500 hover:text-[#00C4B4] transition flex items-center gap-0.5"
-                title="카카오 지도로 위치 보기"
-              >
-                <span>지도</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`https://map.kakao.com/link/to/${encodeURIComponent(
+                    restaurant.name
+                  )},${restaurant.lat},${restaurant.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-2 py-0.5 rounded-md bg-[#FEE500] text-[#191919] text-[10px] font-black hover:bg-[#FDD800] transition flex items-center gap-0.5 shadow-2xs"
+                  title="카카오맵 길찾기"
+                >
+                  <Navigation className="w-2.5 h-2.5 fill-[#191919]" />
+                  <span>길찾기</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveToMapMarker(restaurant);
+                  }}
+                  className="text-[11px] font-bold text-slate-500 hover:text-[#00C4B4] transition flex items-center gap-0.5"
+                  title="지도로 위치 보기"
+                >
+                  <span>지도</span>
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -388,6 +404,20 @@ export default function RestaurantCard({
             <Heart className={`w-4 h-4 ${isFavorite ? "fill-rose-600" : ""}`} />
           </button>
         )}
+
+        <a
+          href={`https://map.kakao.com/link/to/${encodeURIComponent(
+            restaurant.name
+          )},${restaurant.lat},${restaurant.lng}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="px-3 py-1.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-black text-xs transition cursor-pointer shadow-2xs flex items-center gap-1"
+          title="카카오맵 길찾기"
+        >
+          <Navigation className="w-3 h-3 fill-[#191919]" />
+          <span>길찾기</span>
+        </a>
 
         <button
           type="button"

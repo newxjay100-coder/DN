@@ -16,6 +16,9 @@ export default function ServiceStatusBanner({
 }: ServiceStatusBannerProps) {
   const [seedStatus, setSeedStatus] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) return null;
 
   const handleSeedSupabase = async () => {
     setIsSeeding(true);
@@ -40,28 +43,22 @@ export default function ServiceStatusBanner({
     <div
       role="status"
       aria-label="서비스 연동 상태"
-      className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-emerald-950 text-xs"
+      className="bg-slate-900 text-slate-200 border-b border-slate-800 px-4 py-1.5 text-xs"
     >
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 font-bold bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full text-[11px]">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap text-[11px]">
+          <span className="inline-flex items-center gap-1 font-black bg-[#00C4B4] text-slate-950 px-2 py-0.5 rounded-full">
             <CheckCircle2 className="w-3 h-3 text-slate-950" />
-            공공데이터 & Supabase DB 연동
+            공공데이터 & PostGIS 연동
           </span>
-          <span className="text-emerald-950 font-medium">
-            전국(서울·경기·인천 및 17개 시도) 공공 음식점 <strong>{totalCount}곳</strong> 탑재 · 실시간 GPS & 카카오 지도 연동
+          <span className="text-slate-300">
+            전국 17개 시도 공공 음식점 <strong>{totalCount}곳</strong> 탑재 · 실시간 GPS & 카카오 지도
           </span>
-          {dataSource === "supabase" && (
-            <span className="inline-flex items-center gap-1 font-bold text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded-full text-[11px]">
-              <Database className="w-3 h-3 text-emerald-700" />
-              Supabase 클라우드 DB 실시간 조회 중
-            </span>
-          )}
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           {seedStatus && (
-            <span className="text-[11px] font-semibold text-emerald-800">
+            <span className="text-[11px] font-semibold text-teal-300">
               {seedStatus}
             </span>
           )}
@@ -69,11 +66,18 @@ export default function ServiceStatusBanner({
             type="button"
             onClick={handleSeedSupabase}
             disabled={isSeeding}
-            title="현재 음식점 실데이터를 Supabase 테이블에 일괄 적재합니다"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-700 text-white hover:bg-emerald-800 transition cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-teal-300 transition cursor-pointer disabled:opacity-50"
           >
-            <Sparkles className="w-3 h-3" />
-            <span>{isSeeding ? "적재 중..." : "Supabase DB에 동기화"}</span>
+            <Sparkles className="w-2.5 h-2.5" />
+            <span>{isSeeding ? "동기화 중..." : "DB 동기화"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsVisible(false)}
+            className="text-slate-400 hover:text-white p-0.5 transition cursor-pointer"
+            title="닫기"
+          >
+            ✕
           </button>
         </div>
       </div>

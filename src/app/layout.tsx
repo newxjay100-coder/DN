@@ -25,6 +25,11 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossOrigin=""
+        />
         {kakaoKey && (
           <Script
             src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(

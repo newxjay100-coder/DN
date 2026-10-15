@@ -7,6 +7,7 @@ import {
   RestaurantWithDistance,
 } from "@/types/restaurant";
 import { formatDistance } from "@/utils/distance";
+import InteractiveLeafletMap from "./InteractiveLeafletMap";
 import SampleMapView from "./SampleMapView";
 import {
   AlertTriangle,
@@ -18,6 +19,7 @@ import {
   LocateFixed,
   MapPin,
   Minus,
+  Navigation,
   Plus,
   RefreshCw,
   RotateCw,
@@ -202,6 +204,15 @@ export default function KakaoMapView({
   useEffect(() => {
     initKakaoMap();
   }, [initKakaoMap]);
+
+  // 카카오 SDK 로딩 타임아웃 (1.5초 내 미로드 시 인터랙티브 타일 지도 자동 연동)
+  useEffect(() => {
+    if (status === "ready") return;
+    const timeout = setTimeout(() => {
+      setUseFallbackPreview(true);
+    }, 1500);
+    return () => clearTimeout(timeout);
+  }, [status]);
 
   // 기준 위치 및 반경 원 시각화
   useEffect(() => {
@@ -478,35 +489,29 @@ export default function KakaoMapView({
     map.setLevel(current + delta, { animate: true });
   };
 
-  // 카카오 지도 실패 시 프리뷰 지도 전환
-  if (status === "error" && useFallbackPreview) {
+  // 카카오 지도 실패 또는 로딩 지연 시 실제 인터랙티브 타일 지도(리플릿)로 완벽 렌더링
+  if (status === "error" || useFallbackPreview) {
     return (
-      <div className="space-y-3">
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-950">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              카카오 지도 콘솔 설정 전까지 <strong>좌표 프리뷰 지도</strong>를
-              표시 중입니다. 실제 마커와 거리 반경이 동일하게 작동합니다.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setUseFallbackPreview(false)}
-            className="px-3 py-1 rounded-lg font-bold bg-amber-200 hover:bg-amber-300 text-amber-950 transition cursor-pointer"
-          >
-            카카오 설정 안내 다시 보기
-          </button>
-        </div>
-        <SampleMapView
-          restaurants={restaurants}
-          centerCoords={centerCoords}
-          selectedRadius={selectedRadius}
-          locationMode={locationMode}
-          focusedRestaurantId={focusedRestaurantId}
-          onSelectRestaurant={onSelectRestaurantDetail}
-        />
-      </div>
+      <InteractiveLeafletMap
+        restaurants={restaurants}
+        centerCoords={centerCoords}
+        selectedRadius={selectedRadius}
+        locationMode={locationMode}
+        userGpsCoords={userGpsCoords}
+        isGeoLoading={isGeoLoading}
+        focusedRestaurantId={focusedRestaurantId}
+        focusTrigger={focusTrigger}
+        onRequestGeolocation={onRequestGeolocation}
+        onSelectRestaurantDetail={onSelectRestaurantDetail}
+        onFocusRestaurantMarker={onFocusRestaurantMarker}
+        onSearchAtCenter={onSearchAtCenter}
+        onRadiusChange={onRadiusChange}
+        onRetryKakao={() => {
+          setUseFallbackPreview(false);
+          initKakaoMap();
+        }}
+        isKakaoAvailable={isKeyConfigured}
+      />
     );
   }
 
@@ -649,86 +654,6 @@ export default function KakaoMapView({
             </p>
           </div>
         )}
-
-        {status === "error" && (
-          <div
-            role="alert"
-            className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 text-center bg-slate-50"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3 shadow-2xs">
-              <Sliders className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mb-1.5">
-              카카오 지도 서비스 활성화(ON) 설정이 필요합니다
-            </h3>
-
-            <p className="text-xs sm:text-sm text-slate-600 max-w-lg leading-relaxed mb-4">
-              입력해 주신 키(<code>{rawAppKey.slice(0, 8)}...</code>)의 앱(
-              <strong>동내맛집</strong>)에서 카카오 지도 API가 활성화되지
-              않았거나 도메인이 미등록 상태입니다. 아래 순서대로 1번만 설정해
-              주시면 즉시 카카오 지도가 렌더링됩니다.
-            </p>
-
-            <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 p-4 text-left text-xs space-y-2.5 mb-5 shadow-2xs">
-              <div className="flex items-start gap-2">
-                <Sliders className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-slate-900">
-                    1. [필수] 카카오 개발자 콘솔 &gt; 지도/로컬 활성화 (ON)
-                  </p>
-                  <p className="text-slate-600 mt-0.5 leading-relaxed">
-                    <a
-                      href="https://developers.kakao.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-amber-700 font-bold underline inline-flex items-center gap-0.5"
-                    >
-                      Kakao Developers <ExternalLink className="w-3 h-3 inline" />
-                    </a>{" "}
-                    접속 &gt; <strong>내 애플리케이션</strong> &gt;{" "}
-                    <strong>동내맛집</strong> 선택 &gt; 좌측 메뉴{" "}
-                    <strong>제품 설정 &gt; 지도/로컬</strong> &gt;{" "}
-                    <strong>활성화 설정: ON</strong>으로 변경
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 pt-2 border-t border-slate-100">
-                <KeyRound className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-slate-900">
-                    2. Web 플랫폼 사이트 도메인 등록 확인
-                  </p>
-                  <p className="text-slate-600 mt-0.5 font-mono text-[11px]">
-                    내 애플리케이션 &gt; 앱 설정 &gt; 플랫폼 &gt; Web &gt; 사이트
-                    도메인에 <code>http://localhost:3000</code> 등록
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-2.5 flex-wrap">
-              <button
-                type="button"
-                onClick={initKakaoMap}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>활성화 후 지도 다시 불러오기</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setUseFallbackPreview(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-500 transition cursor-pointer"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>프리뷰 지도로 마커·이동 동작 먼저 보기</span>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 하단: 선택된 마커 요약 카드 */}
@@ -756,14 +681,29 @@ export default function KakaoMapView({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onSelectRestaurantDetail(selectedRestaurant)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-500 transition shrink-0 cursor-pointer shadow-xs"
-          >
-            <span>상세·혜택 보기</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <a
+              href={`https://map.kakao.com/link/to/${encodeURIComponent(
+                selectedRestaurant.name
+              )},${selectedRestaurant.lat},${selectedRestaurant.lng}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FDD800] transition cursor-pointer shadow-xs"
+              title="카카오맵으로 바로 길찾기"
+            >
+              <Navigation className="w-3.5 h-3.5 fill-[#191919]" />
+              <span>카카오맵 길찾기</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => onSelectRestaurantDetail(selectedRestaurant)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-slate-900 text-white hover:bg-slate-800 transition shrink-0 cursor-pointer shadow-xs"
+            >
+              <span>상세 보기</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       ) : (
         <div className="p-4 bg-white border-t border-slate-200 text-center text-xs text-slate-500">
