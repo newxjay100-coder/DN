@@ -1,14 +1,17 @@
 "use client";
 
-import { RestaurantWithDistance } from "@/types/restaurant";
+import { RestaurantWithDistance, ViewMode } from "@/types/restaurant";
 import RestaurantCard from "./RestaurantCard";
 import { Building2, RefreshCw, SearchX, Sparkles } from "lucide-react";
 
 interface RestaurantListProps {
   restaurants: RestaurantWithDistance[];
+  viewMode?: ViewMode;
   focusedRestaurantId?: string | null;
   dataSourceFilter?: "all" | "public_data" | "curated";
   publicDataError?: string | null;
+  favorites?: string[];
+  onToggleFavorite?: (id: string) => void;
   onSelectRestaurantDetail: (restaurant: RestaurantWithDistance) => void;
   onMoveToMapMarker: (restaurant: RestaurantWithDistance) => void;
   onResetFilters: () => void;
@@ -19,9 +22,12 @@ interface RestaurantListProps {
 
 export default function RestaurantList({
   restaurants,
+  viewMode = "grid",
   focusedRestaurantId,
   dataSourceFilter = "public_data",
   publicDataError,
+  favorites = [],
+  onToggleFavorite,
   onSelectRestaurantDetail,
   onMoveToMapMarker,
   onResetFilters,
@@ -60,8 +66,8 @@ export default function RestaurantList({
             </>
           ) : (
             <>
-              검색어, 업종 필터, 또는 탐색 반경(500m / 1km / 3km)을 변경해 보세요.
-              상단의 <strong>&lsquo;동네·주소 검색&rsquo;</strong>을 통해 원하는 동네로 직접 이동하실 수도 있습니다.
+              검색어, 업종 필터, 또는 탐색 반경을 변경해 보세요.
+              상단의 <strong>&lsquo;지금 보고있는 지역은 ⌵&rsquo;</strong>을 통해 원하는 동네로 직접 이동하실 수도 있습니다.
             </>
           )}
         </p>
@@ -109,13 +115,39 @@ export default function RestaurantList({
     );
   }
 
+  // 1. 망고플레이트 시그니처 2열 포토 그리드 모드 (모바일 2열, PC 3~4열)
+  if (viewMode === "grid") {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4">
+        {restaurants.map((restaurant, idx) => (
+          <RestaurantCard
+            key={restaurant.id}
+            restaurant={restaurant}
+            index={idx + 1}
+            layoutMode="grid"
+            isFocusedOnMap={focusedRestaurantId === restaurant.id}
+            isFavorite={favorites.includes(restaurant.id)}
+            onToggleFavorite={onToggleFavorite}
+            onSelectDetail={onSelectRestaurantDetail}
+            onMoveToMapMarker={onMoveToMapMarker}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // 2. 다이닝코드 시그니처 가로 리스트 모드
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-      {restaurants.map((restaurant) => (
+    <div className="space-y-3">
+      {restaurants.map((restaurant, idx) => (
         <RestaurantCard
           key={restaurant.id}
           restaurant={restaurant}
+          index={idx + 1}
+          layoutMode="list"
           isFocusedOnMap={focusedRestaurantId === restaurant.id}
+          isFavorite={favorites.includes(restaurant.id)}
+          onToggleFavorite={onToggleFavorite}
           onSelectDetail={onSelectRestaurantDetail}
           onMoveToMapMarker={onMoveToMapMarker}
         />

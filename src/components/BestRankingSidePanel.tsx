@@ -114,8 +114,8 @@ export default function BestRankingSidePanel({
                     {restaurant.category}
                   </span>
                   <span>·</span>
-                  <span className="flex items-center gap-0.5 font-bold text-amber-600">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                  <span className="flex items-center gap-0.5 font-black text-[#FF6B00]">
+                    <Star className="w-3 h-3 fill-[#FF6B00] text-[#FF6B00]" />
                     {restaurant.rating || 4.8}
                   </span>
                   <span>·</span>

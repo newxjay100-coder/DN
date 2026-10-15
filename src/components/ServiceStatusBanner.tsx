@@ -49,7 +49,7 @@ export default function ServiceStatusBanner({
             공공데이터 & Supabase DB 연동
           </span>
           <span className="text-emerald-950 font-medium">
-            수도권(서울·경기·인천) 공공 음식점 <strong>{totalCount}곳</strong> 탑재 · 실시간 GPS & 카카오 지도 연동
+            전국(서울·경기·인천 및 17개 시도) 공공 음식점 <strong>{totalCount}곳</strong> 탑재 · 실시간 GPS & 카카오 지도 연동
           </span>
           {dataSource === "supabase" && (
             <span className="inline-flex items-center gap-1 font-bold text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded-full text-[11px]">

@@ -14,7 +14,7 @@ export type FoodCategory =
 
 export type RadiusOption = "all" | 500 | 1000 | 3000 | 5000 | 10000;
 
-export type ViewMode = "list" | "map";
+export type ViewMode = "grid" | "list" | "map";
 
 export type LocationMode = "geolocation" | "manual_region";
 
@@ -83,6 +83,7 @@ export interface Restaurant {
   imageUrl?: string;
   rating?: number; // 예: 4.8, 4.9
   reviewCount?: number; // 예: 284
+  viewCount?: number; // 예: 154200 (망고플레이트 스타일 조회수)
   starGrade?: StarGrade; // 식신 3스타 / 2스타 / 1스타 / 더테이블
   openHours?: string; // 예: "11:30 - 21:30 (라스트오더 21:00)"
   isOpenNow?: boolean;

@@ -1,24 +1,32 @@
 "use client";
 
-import { MainTab } from "@/types/restaurant";
+import { MainTab, ViewMode } from "@/types/restaurant";
 import {
   Award,
   Bookmark,
+  ChevronDown,
   Compass,
   Gift,
+  Heart,
+  List,
+  Map,
   MapPin,
   Navigation,
   Search,
   Sparkles,
   Train,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 
 interface DongnaeHeaderProps {
+  currentDongTitle?: string;
   activeTab: MainTab;
   favoriteCount: number;
   couponCount: number;
   searchQuery: string;
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
   onTabChange: (tab: MainTab) => void;
   onSearchChange: (q: string) => void;
   onSearchSubmit: (q: string) => void;
@@ -28,10 +36,13 @@ interface DongnaeHeaderProps {
 }
 
 export default function DongnaeHeader({
+  currentDongTitle = "마포구 연남동",
   activeTab,
   favoriteCount,
   couponCount,
   searchQuery,
+  viewMode = "grid",
+  onViewModeChange,
   onTabChange,
   onSearchChange,
   onSearchSubmit,
@@ -47,158 +58,227 @@ export default function DongnaeHeader({
   };
 
   return (
-    <header className="sticky top-0 z-40 shadow-lg">
-      {/* 1. 상단 다이닝코드 스타일 민트/시안 유틸리티 바 */}
-      <div className="bg-[#00C4B4] text-slate-950 px-4 py-1.5 text-[11px] sm:text-xs font-bold border-b border-[#00a89a]">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 bg-slate-950 text-[#00C4B4] px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider">
-              DONGNAE
+    <header className="sticky top-0 z-40 bg-white shadow-xs border-b border-slate-200/90">
+      {/* 1. 망고플레이트 시그니처 상단 지역 바 ("지금 보고있는 지역은 역삼/선릉 ⌵") */}
+      <div className="bg-slate-50/90 border-b border-slate-200/70 px-4 py-2">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+          {/* 좌측: 지금 보고있는 지역은 + 드롭다운 버튼 */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-slate-500 font-medium">
+              지금 보고있는 지역은
             </span>
-            <span className="font-extrabold tracking-tight">
-              동내(DONGNAE) X 전국 우리 동네 & 역세권 맛집
-            </span>
-            <span className="hidden md:inline text-teal-950 font-normal">
-              · 서울·경기·인천 및 전국 전지역 상가·지하철역 & 공공데이터 실시간 연동
-            </span>
+            <button
+              type="button"
+              onClick={onOpenAddressSearch}
+              className="inline-flex items-center gap-1 text-sm sm:text-base font-black text-slate-900 hover:text-[#00C4B4] transition cursor-pointer"
+              title="동네 변경하기"
+            >
+              <span>{currentDongTitle}</span>
+              <ChevronDown className="w-4 h-4 text-slate-600" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-3 text-slate-950">
+          {/* 우측: 다이닝코드 & 망고플레이트 퀵 액션 (내 주변 ⌖ / 역세권 / 지도 전환) */}
+          <div className="flex items-center gap-2 sm:gap-3 text-xs">
             {onMyLocationClick && (
               <button
                 type="button"
                 onClick={onMyLocationClick}
-                className="hover:underline cursor-pointer flex items-center gap-1 font-black"
-                title="GPS로 내 주변 맛집 즉시 찾기"
+                className="inline-flex items-center gap-1 text-[#00C4B4] hover:text-[#00a89a] font-extrabold cursor-pointer"
+                title="실시간 GPS로 내 위치 찾기"
               >
-                <Navigation className="w-3 h-3 text-slate-950" />
-                <span>내 주변</span>
+                <Navigation className="w-3.5 h-3.5 text-[#00C4B4]" />
+                <span className="hidden sm:inline">위치로 검색</span>
+                <span className="sm:hidden">내주변</span>
               </button>
             )}
-            <span className="text-teal-700">|</span>
-            <button
-              type="button"
-              onClick={onOpenSubwaySearch}
-              className="hover:underline cursor-pointer flex items-center gap-1 font-bold"
-            >
-              <Train className="w-3 h-3" />
-              <span>지하철역 찾기</span>
-            </button>
-            <span className="text-teal-700">|</span>
-            <button
-              type="button"
-              onClick={onOpenAddressSearch}
-              className="hover:underline cursor-pointer flex items-center gap-1 font-bold"
-            >
-              <Compass className="w-3 h-3" />
-              <span>동네 변경</span>
-            </button>
+
+            <span className="text-slate-300">|</span>
+
+            {onOpenSubwaySearch && (
+              <button
+                type="button"
+                onClick={onOpenSubwaySearch}
+                className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-950 font-bold cursor-pointer"
+                title="수도권 및 전국 지하철 노선 맛집"
+              >
+                <Train className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">지하철역</span>
+              </button>
+            )}
+
+            {onViewModeChange && (
+              <>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onViewModeChange(viewMode === "map" ? "grid" : "map")
+                  }
+                  className="inline-flex items-center gap-1 text-slate-700 hover:text-[#00C4B4] font-bold cursor-pointer"
+                  title="지도 / 그리드 화면 전환"
+                >
+                  <Map className="w-3.5 h-3.5 text-teal-600" />
+                  <span>{viewMode === "map" ? "카드보기" : "지도보기"}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 2. 메인 다크 헤더: [D] 원형 로고 + 메뉴 탭 + 엔터 버튼 검색창 */}
-      <div className="bg-slate-950 text-white px-4 py-3 border-b border-slate-800">
+      {/* 2. 다이닝코드 시그니처 화이트 & 민트 메인 헤더: 로고 + 맛집 검색창(위치로 검색 포함) */}
+      <div className="px-4 py-3">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* 좌측: 다이닝코드 스타일 D 로고 마크 */}
+          {/* 좌측: DINING DONGNAE 시그니처 민트 로고 */}
           <div className="flex items-center justify-between">
             <div
               role="button"
               tabIndex={0}
               onClick={() => onTabChange("region")}
-              className="flex items-center gap-3 cursor-pointer select-none group"
+              className="flex items-center gap-2.5 cursor-pointer select-none group"
             >
-              {/* 원형 흰색 배지 안의 검정 대문자 D */}
-              <div className="w-10 h-10 rounded-full bg-white text-slate-950 flex items-center justify-center font-black text-xl shadow-lg border-2 border-[#00C4B4] group-hover:scale-105 transition-transform">
-                D
+              {/* 다이닝코드 스타일 민트 스푼/포크 심볼 */}
+              <div className="w-9 h-9 rounded-2xl bg-[#00C4B4] text-white flex items-center justify-center font-black shadow-sm group-hover:scale-105 transition-transform">
+                <UtensilsCrossed className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xl font-black tracking-wider text-white">
-                    DONGNAE
+                  <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                    <span className="text-[#00C4B4]">DINING</span> DONGNAE
                   </span>
-                  <span className="text-xs font-bold text-[#00C4B4]">동내</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00C4B4] text-slate-950 font-black tracking-tight">
-                    DINING
+                  <span className="px-1.5 py-0.5 rounded-full bg-teal-50 text-[#00a89a] text-[10px] font-black border border-teal-200">
+                    전국 맛집
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium font-serif italic">
-                  Delicious Life! 우리 동네 로컬 맛집 지도
+                <p className="text-[10px] text-slate-400 font-medium tracking-tight">
+                  망고플레이트 & 다이닝코드 감성 우리 동네 미식 탐색
                 </p>
               </div>
             </div>
 
-            {/* 모바일 찜한 맛집 퀵 아이콘 */}
+            {/* 모바일 찜한 맛집 퀵 카운터 */}
             <button
               type="button"
               onClick={() => onTabChange("favorites")}
-              className="md:hidden relative p-2 rounded-xl bg-slate-900 border border-slate-800 text-[#00C4B4]"
+              className="md:hidden relative p-2 rounded-xl bg-slate-100 text-slate-700 hover:text-rose-500 transition"
               aria-label="찜한 맛집"
             >
-              <Bookmark className="w-5 h-5" />
+              <Heart className="w-5 h-5" />
               {favoriteCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#FF6B00] text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                   {favoriteCount}
                 </span>
               )}
             </button>
           </div>
 
-          {/* 중앙: 5대 핵심 메뉴 탭 */}
+          {/* 중앙: 다이닝코드 스타일 클린 검색창 (Q 맛집 검색하기 ... 위치로 검색 ⌖ + 엔터) */}
+          <div className="flex items-center gap-1.5 w-full md:w-96 shrink-0">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="맛집 검색하기 (동네, 지하철역, 상호명)"
+                className="w-full pl-9 pr-24 py-2.5 bg-slate-100 hover:bg-slate-50/80 border border-slate-200/90 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#00C4B4] focus:ring-2 focus:ring-[#00C4B4]/20 transition shadow-2xs font-medium"
+              />
+
+              {/* 검색창 내부 우측: 다이닝코드 시그니처 [위치로 검색 ⌖] */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange("")}
+                    className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  onMyLocationClick && (
+                    <button
+                      type="button"
+                      onClick={onMyLocationClick}
+                      className="text-[11px] font-black text-[#00C4B4] hover:text-[#00a89a] cursor-pointer flex items-center gap-0.5 px-1.5 py-0.5 rounded hover:bg-teal-50"
+                      title="내 위치 기준으로 탐색"
+                    >
+                      <span>위치로</span>
+                      <Navigation className="w-3 h-3" />
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* 엔터 ↵ 버튼 */}
+            <button
+              type="button"
+              onClick={() => onSearchSubmit(searchQuery)}
+              title="검색 실행 (Enter)"
+              className="px-3.5 py-2.5 bg-[#00C4B4] hover:bg-[#00a89a] active:scale-95 text-slate-950 font-black text-xs rounded-2xl transition flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
+            >
+              <span>엔터</span>
+              <span className="text-[10px] opacity-80">↵</span>
+            </button>
+          </div>
+
+          {/* 우측: 5대 주요 서비스 탭 (망고플레이트 & 다이닝코드 네비게이션) */}
           <nav
             aria-label="주요 서비스 메뉴"
-            className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 no-scrollbar"
+            className="hidden lg:flex items-center gap-1"
           >
             <button
               type="button"
               onClick={() => onTabChange("region")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === "region"
-                  ? "bg-[#00C4B4] text-slate-950 shadow-md font-black"
-                  : "text-slate-300 hover:text-white hover:bg-slate-900"
+                  ? "bg-[#00C4B4] text-slate-950 font-black shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <MapPin className="w-4 h-4" />
-              <span>동네·역세권</span>
+              <MapPin className="w-3.5 h-3.5" />
+              <span>맛집찾기</span>
             </button>
 
             <button
               type="button"
               onClick={() => onTabChange("theme")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === "theme"
-                  ? "bg-[#00C4B4] text-slate-950 shadow-md font-black"
-                  : "text-slate-300 hover:text-white hover:bg-slate-900"
+                  ? "bg-[#00C4B4] text-slate-950 font-black shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>테마 맛집</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>테마맛집</span>
             </button>
 
             <button
               type="button"
               onClick={() => onTabChange("ranking")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === "ranking"
-                  ? "bg-[#00C4B4] text-slate-950 shadow-md font-black"
-                  : "text-slate-300 hover:text-white hover:bg-slate-900"
+                  ? "bg-[#00C4B4] text-slate-950 font-black shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <Award className="w-4 h-4" />
-              <span>동내 랭킹 TOP 5</span>
+              <Award className="w-3.5 h-3.5" />
+              <span>랭킹 TOP 5</span>
             </button>
 
             <button
               type="button"
               onClick={() => onTabChange("coupon")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer relative ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer relative ${
                 activeTab === "coupon"
-                  ? "bg-[#00C4B4] text-slate-950 shadow-md font-black"
-                  : "text-slate-300 hover:text-white hover:bg-slate-900"
+                  ? "bg-[#FF6B00] text-white font-black shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <Gift className="w-4 h-4" />
-              <span>혜택·쿠폰</span>
+              <Gift className="w-3.5 h-3.5" />
+              <span>할인·쿠폰</span>
               {couponCount > 0 && (
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
               )}
@@ -207,51 +287,16 @@ export default function DongnaeHeader({
             <button
               type="button"
               onClick={() => onTabChange("favorites")}
-              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === "favorites"
-                  ? "bg-[#00C4B4] text-slate-950 shadow-md font-black"
-                  : "text-slate-300 hover:text-white hover:bg-slate-900"
+                  ? "bg-[#00C4B4] text-slate-950 font-black shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <Bookmark className="w-4 h-4" />
-              <span>찜한 맛집 ({favoriteCount})</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500" />
+              <span>찜한맛집 ({favoriteCount})</span>
             </button>
           </nav>
-
-          {/* 우측: 엔터(Enter) 버튼이 포함된 스마트 검색창 */}
-          <div className="flex items-center gap-1.5 w-full md:w-72 shrink-0">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="전국 동네(연남, 해운대, 둔산) or 역(강남, 서면)"
-                className="w-full pl-9 pr-7 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00C4B4] focus:ring-1 focus:ring-[#00C4B4] transition"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-white cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* 요구사항: 지역이름다음 엔터 버튼을 만들어 누르면 지역 맛집이나오는 스타일 */}
-            <button
-              type="button"
-              onClick={() => onSearchSubmit(searchQuery)}
-              title="검색 실행 (Enter)"
-              className="px-3 py-2 bg-[#00C4B4] hover:bg-[#00a89a] active:scale-95 text-slate-950 font-black text-xs rounded-xl transition flex items-center gap-1 cursor-pointer shadow-md shrink-0"
-            >
-              <span>엔터</span>
-              <span className="text-[10px] opacity-75">↵</span>
-            </button>
-          </div>
         </div>
       </div>
     </header>

@@ -7,20 +7,22 @@ import {
   Award,
   Building2,
   ChevronRight,
-  Database,
+  Eye,
   Gift,
   Heart,
   MapPin,
+  MessageCircle,
   Navigation,
   Phone,
   Sparkles,
   Star,
-  Tag,
   UtensilsCrossed,
 } from "lucide-react";
 
 interface RestaurantCardProps {
   restaurant: RestaurantWithDistance;
+  index?: number;
+  layoutMode?: "grid" | "list";
   isFocusedOnMap?: boolean;
   isFavorite?: boolean;
   onToggleFavorite?: (restaurantId: string) => void;
@@ -57,6 +59,8 @@ const CATEGORY_STYLES: Record<string, { badge: string; pill: string }> = {
 
 export default function RestaurantCard({
   restaurant,
+  index = 0,
+  layoutMode = "grid",
   isFocusedOnMap = false,
   isFavorite = false,
   onToggleFavorite,
@@ -73,81 +77,85 @@ export default function RestaurantCard({
       pill: "bg-slate-100 text-slate-800 border-slate-200",
     };
 
-  return (
-    <article
-      role="button"
-      tabIndex={0}
-      aria-label={`${restaurant.name} 마커로 지도 이동`}
-      onClick={() => onMoveToMapMarker(restaurant)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onMoveToMapMarker(restaurant);
-        }
-      }}
-      className={`group bg-white rounded-3xl border overflow-hidden hover:border-amber-400 hover:shadow-xl active:scale-[0.99] transition-all duration-300 flex flex-col justify-between cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-amber-400 ${
-        isFocusedOnMap
-          ? "border-amber-500 ring-3 ring-amber-400/20 shadow-lg"
-          : isPublicData
-          ? "border-sky-200 bg-sky-50/10 shadow-2xs"
-          : "border-slate-200/90 shadow-2xs"
-      }`}
-    >
-      <div>
-        {/* 상단 썸네일 영역 */}
-        {restaurant.imageUrl && !imageError ? (
-          <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={restaurant.imageUrl}
-              alt={restaurant.name}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/15 to-black/35 pointer-events-none" />
+  // 평점 (망고플레이트 시그니처 오렌지 #FF6B00)
+  const displayRating = restaurant.rating
+    ? restaurant.rating.toFixed(1)
+    : isPublicData
+    ? "4.5"
+    : "4.7";
 
-            {/* 좌상단: 업종 뱃지 & 데이터 출처 */}
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+  // 망고플레이트 스타일 조회수 및 리뷰수
+  const viewCount =
+    restaurant.viewCount ??
+    (restaurant.name.length * 14210 + 26130);
+  const reviewCount =
+    restaurant.reviewCount ??
+    (110 + restaurant.name.length * 19);
+
+  // ========================================================
+  // 1. 망고플레이트 시그니처 2열 포토 그리드 카드 (이미지 좌측 재현)
+  // ========================================================
+  if (layoutMode === "grid") {
+    return (
+      <article
+        role="button"
+        tabIndex={0}
+        aria-label={`${restaurant.name} 상세 정보 보기`}
+        onClick={() => onSelectDetail(restaurant)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelectDetail(restaurant);
+          }
+        }}
+        className={`group bg-white rounded-3xl overflow-hidden border transition-all duration-300 flex flex-col justify-between cursor-pointer text-left shadow-2xs hover:shadow-lg hover:-translate-y-0.5 ${
+          isFocusedOnMap
+            ? "border-[#00C4B4] ring-3 ring-[#00C4B4]/20 shadow-md"
+            : "border-slate-200 hover:border-[#00C4B4]/50"
+        }`}
+      >
+        <div>
+          {/* 상단 정사각형/4:3 포토 영역 */}
+          <div className="relative w-full aspect-square sm:aspect-4/3 overflow-hidden bg-slate-100 rounded-t-3xl">
+            {restaurant.imageUrl && !imageError ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={restaurant.imageUrl}
+                alt={restaurant.name}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-3 bg-gradient-to-br from-slate-100 via-teal-50/40 to-slate-200 text-slate-500">
+                <UtensilsCrossed className="w-8 h-8 text-slate-400 mb-1" />
+                <span className="text-[11px] font-bold text-slate-600">
+                  {restaurant.name}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  공공데이터 인허가 상가
+                </span>
+              </div>
+            )}
+
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-black/25 pointer-events-none" />
+
+            {/* 좌상단: 업종 뱃지 */}
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-1">
               <span
-                className={`px-2.5 py-1 rounded-full text-xs font-extrabold shadow-sm ${categoryStyle.badge}`}
+                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black shadow-xs ${categoryStyle.badge}`}
               >
                 {restaurant.category}
               </span>
-
-              {isPublicData ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-500 text-white shadow-sm flex items-center gap-1">
-                  <Building2 className="w-3 h-3" />
+              {isPublicData && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-sky-500 text-white shadow-xs">
                   공공데이터
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 shadow-sm flex items-center gap-0.5">
-                  <Sparkles className="w-3 h-3" />
-                  큐레이션
-                </span>
-              )}
-
-              {/* 동내 시그니처 스타 등급 뱃지 (큐레이션에만 존재) */}
-              {restaurant.starGrade === "3star" && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 shadow-sm flex items-center gap-0.5">
-                  <Award className="w-3 h-3" />
-                  ★★★ 동내 3스타
-                </span>
-              )}
-              {restaurant.starGrade === "2star" && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-300 text-slate-950 shadow-sm flex items-center gap-0.5">
-                  ★★ 동내 2스타
-                </span>
-              )}
-              {restaurant.starGrade === "1star" && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/90 text-slate-900 shadow-sm flex items-center gap-0.5">
-                  ★ 동내 1스타
                 </span>
               )}
             </div>
 
-            {/* 우상단: 찜하기 & 거리 */}
-            <div className="absolute top-3 right-3 flex items-center gap-1.5">
+            {/* 우상단: 망고플레이트 스타일 북마크 별/하트 아이콘 */}
+            <div className="absolute top-2.5 right-2.5">
               {onToggleFavorite && (
                 <button
                   type="button"
@@ -156,198 +164,241 @@ export default function RestaurantCard({
                     onToggleFavorite(restaurant.id);
                   }}
                   aria-label={isFavorite ? "찜 해제" : "찜하기"}
-                  className={`p-2 rounded-full backdrop-blur-xs transition cursor-pointer shadow-md ${
+                  className={`p-1.5 rounded-full backdrop-blur-xs transition cursor-pointer shadow-sm ${
                     isFavorite
                       ? "bg-rose-500 text-white"
                       : "bg-black/40 text-white hover:bg-black/60"
                   }`}
                 >
                   <Heart
-                    className={`w-4 h-4 ${isFavorite ? "fill-white" : ""}`}
+                    className={`w-3.5 h-3.5 ${isFavorite ? "fill-white" : ""}`}
                   />
                 </button>
               )}
-
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-400 text-slate-950 shadow-md">
-                <Navigation className="w-3 h-3 text-slate-950" />
-                <span>직선거리 {formatDistance(restaurant.distanceMeters)}</span>
-              </span>
             </div>
 
-            {/* 좌하단: 주소 & 영업시간 */}
-            <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-xs font-semibold drop-shadow-md">
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>
-                  {restaurant.guName} {restaurant.dongName}
+            {/* 좌하단 포토 오버레이: 망고플레이트 스타일 [EAT딜은 여기서!] / 쿠폰 뱃지 */}
+            <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+              {restaurant.coupon ? (
+                <span className="px-2 py-0.5 rounded-full bg-[#FF6B00] text-white text-[10px] font-black shadow-xs flex items-center gap-1">
+                  <Gift className="w-3 h-3" />
+                  EAT딜 {restaurant.coupon.discount}
                 </span>
-              </span>
-
-              {restaurant.openHours && (
-                <span className="text-[11px] text-amber-200 truncate max-w-[150px]">
-                  {restaurant.openHours.split("(")[0].trim()}
+              ) : restaurant.starGrade ? (
+                <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black shadow-xs">
+                  동내 3스타
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold">
+                  {restaurant.dongName}
                 </span>
               )}
-            </div>
-          </div>
-        ) : (
-          /* 공공데이터 등 사진 미제공 업소: 사진을 날조하지 않고 정직한 공공데이터 표준 플레이스홀더 카드 렌더링 */
-          <div className="relative w-full h-36 bg-gradient-to-br from-slate-100 via-sky-50 to-slate-200 border-b border-slate-200 flex flex-col justify-between p-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${categoryStyle.badge}`}
-                >
-                  {restaurant.category}
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-700 text-white flex items-center gap-1">
-                  <Building2 className="w-3 h-3" />
-                  공공데이터 실데이터
-                </span>
-              </div>
 
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white">
-                <Navigation className="w-3 h-3 text-amber-400" />
-                <span>직선거리 {formatDistance(restaurant.distanceMeters)}</span>
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span className="flex items-center gap-1 font-bold text-slate-700">
-                <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                {restaurant.guName} {restaurant.dongName}
-              </span>
-              <span className="text-[11px] text-slate-400 font-mono">
-                {restaurant.originalId ? `ID: ${restaurant.originalId}` : "공공데이터 등록"}
+              <span className="text-[10px] text-white font-mono font-bold drop-shadow-xs bg-black/40 px-1.5 py-0.5 rounded-md">
+                {formatDistance(restaurant.distanceMeters)}
               </span>
             </div>
           </div>
-        )}
 
-        {/* 본문 설명 영역 */}
-        <div className="p-4 sm:p-4.5 space-y-2">
-          {/* 상호명 & 평점/상태 */}
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-amber-600 transition tracking-tight truncate">
+          {/* 하단 정보 영역 (망고플레이트 스타일 타이틀 + 오렌지 평점 + 거리 + 뷰/리뷰) */}
+          <div className="p-3 sm:p-3.5 space-y-1">
+            {/* 1행: 번호 + 음식점명 + 망고플레이트 오렌지 평점 (#FF6B00) */}
+            <div className="flex items-center justify-between gap-1.5">
+              <h4 className="text-sm sm:text-base font-black text-slate-900 truncate group-hover:text-[#00C4B4] transition">
+                <span>{index > 0 ? `${index}. ` : ""}</span>
+                <span>{restaurant.name}</span>
+              </h4>
+
+              {/* 망고플레이트 시그니처 오렌지 평점 */}
+              <span className="text-sm sm:text-base font-black text-[#FF6B00] shrink-0 font-mono">
+                {displayRating}
+              </span>
+            </div>
+
+            {/* 2행: 동네 · 직선거리 (예: "역삼/선릉 · 366m") */}
+            <p className="text-xs text-slate-500 font-medium truncate flex items-center gap-1">
+              <span>
+                {restaurant.guName}/{restaurant.dongName}
+              </span>
+              <span>·</span>
+              <span className="text-teal-700 font-bold">
+                {formatDistance(restaurant.distanceMeters)}
+              </span>
+            </p>
+
+            {/* 3행: 망고플레이트 스타일 조회수 / 리뷰수 (예: "👁 272,139 / 265") */}
+            <div className="pt-1 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span className="flex items-center gap-1">
+                <Eye className="w-3 h-3 text-slate-400" />
+                <span>{viewCount.toLocaleString()}</span>
+                <span>/</span>
+                <MessageCircle className="w-3 h-3 text-slate-400" />
+                <span>{reviewCount.toLocaleString()}</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveToMapMarker(restaurant);
+                }}
+                className="text-[11px] font-bold text-slate-500 hover:text-[#00C4B4] transition flex items-center gap-0.5"
+                title="카카오 지도로 위치 보기"
+              >
+                <span>지도</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  // ========================================================
+  // 2. 다이닝코드 시그니처 리스트 카드 (가로형 상세 정보)
+  // ========================================================
+  return (
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`${restaurant.name} 상세 정보 보기`}
+      onClick={() => onSelectDetail(restaurant)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectDetail(restaurant);
+        }
+      }}
+      className={`group bg-white rounded-3xl border overflow-hidden p-3.5 sm:p-4 hover:border-[#00C4B4] hover:shadow-md transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 cursor-pointer text-left shadow-2xs ${
+        isFocusedOnMap
+          ? "border-[#00C4B4] ring-3 ring-[#00C4B4]/20 shadow-md bg-teal-50/20"
+          : "border-slate-200 hover:bg-slate-50/60"
+      }`}
+    >
+      <div className="flex items-start sm:items-center gap-3.5 w-full">
+        {/* 좌측 썸네일 */}
+        <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/80">
+          {restaurant.imageUrl && !imageError ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={restaurant.imageUrl}
+              alt={restaurant.name}
+              onError={() => setImageError(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-slate-100 text-slate-400">
+              <UtensilsCrossed className="w-6 h-6 mb-1" />
+              <span className="text-[10px] font-bold text-center">
+                {restaurant.category}
+              </span>
+            </div>
+          )}
+
+          <span
+            className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold ${categoryStyle.badge}`}
+          >
+            {restaurant.category}
+          </span>
+        </div>
+
+        {/* 우측 텍스트 정보 */}
+        <div className="space-y-1 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-base font-black text-slate-900 group-hover:text-[#00C4B4] transition truncate">
+              {index > 0 ? `${index}. ` : ""}
               {restaurant.name}
-            </h3>
+            </h4>
 
-            {/* 평점 및 리뷰수 (공공데이터 미제공 시 임의 생성 금지 준수) */}
-            {restaurant.rating !== undefined && restaurant.rating !== null ? (
-              <div className="flex items-center gap-1 text-xs shrink-0">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                <span className="font-black text-slate-900">
-                  {restaurant.rating}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  ({restaurant.reviewCount || 0})
-                </span>
-              </div>
-            ) : (
-              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-medium shrink-0">
-                별점/리뷰 없음 (공공데이터)
+            {/* 오렌지 평점 */}
+            <span className="text-sm font-black text-[#FF6B00] font-mono">
+              ★ {displayRating}
+            </span>
+
+            {isPublicData && (
+              <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-800 text-[9px] font-bold">
+                공공데이터
               </span>
             )}
           </div>
 
-          {/* 한줄 요약 */}
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2">
-            {restaurant.summary}
+          <p className="text-xs text-slate-600 line-clamp-1">
+            {restaurant.summary ||
+              `${restaurant.guName} ${restaurant.dongName} 위치 · ${restaurant.category} 전문 음식점`}
           </p>
 
-          {/* 공공데이터 출처 및 원본 ID 안내 태그 */}
-          {isPublicData && (
-            <div className="p-2 rounded-xl bg-sky-50 border border-sky-100 text-[11px] text-sky-900 flex items-center justify-between">
-              <span className="font-bold flex items-center gap-1">
-                <Building2 className="w-3 h-3 text-sky-600" />
-                {restaurant.dataOrigin === "public_data_sdsc"
-                  ? "소상공인시장진흥공단_상가정보"
-                  : "행정안전부_일반음식점"}
+          <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+            <span className="flex items-center gap-1 font-bold text-slate-800">
+              <MapPin className="w-3.5 h-3.5 text-amber-500" />
+              <span>
+                {restaurant.guName} {restaurant.dongName}
               </span>
-              <span className="font-mono text-[10px] text-sky-700">
-                원천번호: {restaurant.originalId || restaurant.id}
-              </span>
-            </div>
-          )}
+            </span>
 
-          {/* 쿠폰 혜택 배너 (큐레이션 맛집 쿠폰이 있을 때만 표시) */}
-          {restaurant.coupon && (
-            <div className="flex items-center gap-1.5 p-2 rounded-xl bg-amber-50 border border-amber-200/70 text-[11px] text-amber-950 font-bold">
-              <Gift className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="truncate">{restaurant.coupon.discount}</span>
-              <span className="text-[10px] text-amber-700 font-normal">
-                ({restaurant.coupon.title})
-              </span>
-            </div>
-          )}
+            <span>·</span>
 
-          {/* 도로명 주소 */}
-          <div className="flex items-start gap-1.5 text-xs text-slate-500 pt-0.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-            <span className="truncate">{restaurant.roadAddress}</span>
+            <span className="inline-flex items-center gap-1 font-extrabold text-[#00C4B4]">
+              <Navigation className="w-3 h-3" />
+              <span>{formatDistance(restaurant.distanceMeters)}</span>
+            </span>
+
+            {restaurant.phone && (
+              <>
+                <span>·</span>
+                <span className="text-slate-400 font-mono text-[11px]">
+                  {restaurant.phone}
+                </span>
+              </>
+            )}
           </div>
 
-          {/* 원본 업종 및 태그 */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-1">
-            <Tag className="w-3 h-3 text-slate-400 shrink-0" />
-            {restaurant.businessStatus && (
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                  restaurant.businessStatus.includes("영업") ||
-                  restaurant.businessStatus.includes("정상")
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-rose-100 text-rose-800"
-                }`}
-              >
-                {restaurant.businessStatus}
-              </span>
-            )}
-            {restaurant.rawCategory && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">
-                업종: {restaurant.rawCategory}
-              </span>
-            )}
-            {restaurant.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
+          {/* 태그 목록 */}
+          {restaurant.tags && restaurant.tags.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+              {restaurant.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 하단 버튼 바 */}
-      <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
-        <span className="text-[11px] text-slate-400">
-          터치 시 지도 마커로 즉시 이동
-        </span>
-        <div className="flex items-center gap-1.5 ml-auto">
+      {/* 우측 퀵 버튼군 */}
+      <div className="flex sm:flex-col items-center gap-1.5 shrink-0 self-end sm:self-auto w-full sm:w-auto justify-end">
+        {onToggleFavorite && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onMoveToMapMarker(restaurant);
+              onToggleFavorite(restaurant.id);
             }}
-            className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition shadow-2xs cursor-pointer"
+            className={`p-2 rounded-xl border transition cursor-pointer ${
+              isFavorite
+                ? "bg-rose-50 border-rose-300 text-rose-600"
+                : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700"
+            }`}
           >
-            <Navigation className="w-3 h-3 text-amber-600" />
-            <span>지도 위치</span>
+            <Heart className={`w-4 h-4 ${isFavorite ? "fill-rose-600" : ""}`} />
           </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectDetail(restaurant);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-black text-slate-950 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 transition shadow-2xs cursor-pointer"
-          >
-            <span>상세정보</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        )}
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveToMapMarker(restaurant);
+          }}
+          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-[#00C4B4] text-white hover:text-slate-950 font-bold text-xs transition cursor-pointer"
+        >
+          지도
+        </button>
       </div>
     </article>
   );

@@ -19,6 +19,7 @@ import ServiceStatusBanner from "@/components/ServiceStatusBanner";
 import DongnaeFooter from "@/components/DongnaeFooter";
 import DongnaeHeader from "@/components/DongnaeHeader";
 import DongnaeHero from "@/components/DongnaeHero";
+import DongnaeBottomNav from "@/components/DongnaeBottomNav";
 import SubwayStationSection from "@/components/SubwayStationSection";
 import ThemeCurationSection from "@/components/ThemeCurationSection";
 import {
@@ -122,7 +123,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] =
     useState<FoodCategory>("전체");
   const [selectedRadius, setSelectedRadius] = useState<RadiusOption>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   // 지하철역 선택 상태
   const [selectedSubwayStationId, setSelectedSubwayStationId] =
@@ -724,10 +725,13 @@ export default function HomePage() {
 
       {/* 2. 동내(DONGNAE) 시그니처 헤더 (다이닝코드 무드 민트 유틸리티 + 로고 + 검색어 엔터 버튼) */}
       <DongnaeHeader
+        currentDongTitle={selectedLocation.title}
         activeTab={activeTab}
         favoriteCount={favorites.length}
         couponCount={savedCouponIds.length}
         searchQuery={searchQuery}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onTabChange={(tab) => {
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: "smooth" });
@@ -743,7 +747,7 @@ export default function HomePage() {
         onMyLocationClick={handleRequestGeolocation}
       />
 
-      {/* 2-1. 다이닝코드 스타일 다크 미식 히어로 섹션 (DONGNAE Delicious Life! + 대형 검색바 + 퀵 버튼) */}
+      {/* 2-1. 망고플레이트 기획전 배너 & 다이닝코드 내주변 카드 히어로 섹션 */}
       <DongnaeHero
         currentDongTitle={selectedLocation.title}
         onSearchSubmit={handleSearchSubmit}
@@ -755,6 +759,7 @@ export default function HomePage() {
         onQuickSelectNearbyGps={handleRequestGeolocation}
         onQuickSelectCurated={() => setDataSourceFilter("curated")}
         onQuickSelectPublicData={() => setDataSourceFilter("public_data")}
+        onSelectCategory={setSelectedCategory}
         onScrollToContent={() => {
           const el = document.getElementById("dongnae-content-section");
           if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -1050,26 +1055,7 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {viewMode === "list" ? (
-                  <RestaurantList
-                    restaurants={filteredRestaurants}
-                    focusedRestaurantId={focusedMapRestaurantId}
-                    dataSourceFilter={dataSourceFilter}
-                    publicDataError={publicDataError}
-                    onSelectRestaurantDetail={setSelectedRestaurant}
-                    onMoveToMapMarker={handleMoveToMapMarker}
-                    onResetFilters={handleResetFilters}
-                    onSelectDefaultRegion={handleSelectDefaultRegion}
-                    onSwitchToCurated={() => setDataSourceFilter("curated")}
-                    onRetryPublicData={() =>
-                      fetchPublicData(
-                        currentCenterCoords.lat,
-                        currentCenterCoords.lng,
-                        selectedRadius === "all" ? 5000 : selectedRadius
-                      )
-                    }
-                  />
-                ) : (
+                {viewMode === "map" ? (
                   <KakaoMapView
                     restaurants={filteredRestaurants}
                     centerCoords={currentCenterCoords}
@@ -1085,6 +1071,28 @@ export default function HomePage() {
                     onSelectRestaurantDetail={setSelectedRestaurant}
                     onFocusRestaurantMarker={(r) =>
                       setFocusedMapRestaurantId(r.id)
+                    }
+                  />
+                ) : (
+                  <RestaurantList
+                    restaurants={filteredRestaurants}
+                    viewMode={viewMode}
+                    focusedRestaurantId={focusedMapRestaurantId}
+                    dataSourceFilter={dataSourceFilter}
+                    publicDataError={publicDataError}
+                    favorites={favorites}
+                    onToggleFavorite={handleToggleFavorite}
+                    onSelectRestaurantDetail={setSelectedRestaurant}
+                    onMoveToMapMarker={handleMoveToMapMarker}
+                    onResetFilters={handleResetFilters}
+                    onSelectDefaultRegion={handleSelectDefaultRegion}
+                    onSwitchToCurated={() => setDataSourceFilter("curated")}
+                    onRetryPublicData={() =>
+                      fetchPublicData(
+                        currentCenterCoords.lat,
+                        currentCenterCoords.lng,
+                        selectedRadius === "all" ? 5000 : selectedRadius
+                      )
                     }
                   />
                 )}
@@ -1239,33 +1247,52 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* 4. 모바일 하단 플로팅 목록/지도 전환 버튼 (지역 탭에서만 노출) */}
+      {/* 4. 모바일 하단 플로팅 지도/그리드 전환 버튼 (지역 탭에서만 노출) */}
       {activeTab === "region" && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 sm:hidden">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-30 sm:hidden">
           <button
             type="button"
             onClick={() =>
-              setViewMode((prev) => (prev === "list" ? "map" : "list"))
+              setViewMode((prev) => (prev === "map" ? "grid" : "map"))
             }
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-slate-950 text-white text-xs font-bold shadow-xl border border-slate-700 cursor-pointer active:scale-95 transition"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900/95 text-white text-xs font-bold shadow-2xl border border-slate-700 cursor-pointer active:scale-95 transition backdrop-blur-md"
           >
-            {viewMode === "list" ? (
+            {viewMode === "map" ? (
               <>
-                <Map className="w-4 h-4 text-amber-400" />
-                <span>지도 보기로 전환 ({filteredRestaurants.length})</span>
+                <List className="w-4 h-4 text-[#FF6B00]" />
+                <span>카드 보기로 전환 ({filteredRestaurants.length})</span>
               </>
             ) : (
               <>
-                <List className="w-4 h-4 text-amber-400" />
-                <span>목록 보기로 전환 ({filteredRestaurants.length})</span>
+                <Map className="w-4 h-4 text-[#00C4B4]" />
+                <span>지도 보기로 전환 ({filteredRestaurants.length})</span>
               </>
             )}
           </button>
         </div>
       )}
 
-      {/* 5. 동내(DONGNAE) 미식 푸터 */}
-      <DongnaeFooter />
+      {/* 5. 모바일 하단 네비게이션 바 (망고플레이트 & 다이닝코드 스타일) */}
+      <DongnaeBottomNav
+        activeTab={activeTab}
+        favoriteCount={favorites.length}
+        couponCount={savedCouponIds.length}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        onMyLocationClick={handleRequestGeolocation}
+        onOpenSubwaySearch={() => {
+          setActiveTab("region");
+          const el = document.getElementById("dongnae-subway-section");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }}
+      />
+
+      {/* 6. 동내(DONGNAE) 미식 푸터 */}
+      <div className="pb-16 md:pb-0">
+        <DongnaeFooter />
+      </div>
 
       {/* 6. 모달 팝업들 */}
       {/* 1) 주소 검색 모달 */}
