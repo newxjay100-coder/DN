@@ -17,6 +17,8 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 .idea/
 *.iml
+*.apk
+*.aab
 
 # debug
 npm-debug.log*
