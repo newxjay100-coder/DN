@@ -3,14 +3,31 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const apiDir = path.join(__dirname, "..", "src", "app", "api");
-const tempDir = path.join(__dirname, "..", "src", "app", "_api_temp");
 
-let renamed = false;
-try {
-  if (fs.existsSync(apiDir)) {
-    fs.renameSync(apiDir, tempDir);
-    renamed = true;
+function getRouteFiles(dir) {
+  let results = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir, { withFileTypes: true });
+  for (const item of list) {
+    const full = path.join(dir, item.name);
+    if (item.isDirectory()) {
+      results = results.concat(getRouteFiles(full));
+    } else if (item.name === "route.ts" || item.name === "route.js") {
+      results.push(full);
+    }
   }
+  return results;
+}
+
+const renamedFiles = [];
+try {
+  const routes = getRouteFiles(apiDir);
+  for (const r of routes) {
+    const bak = r + ".bak";
+    fs.renameSync(r, bak);
+    renamedFiles.push({ original: r, backup: bak });
+  }
+
   console.log("⚡ Building static export for Capacitor app...");
   execSync("npx cross-env CAPACITOR_BUILD=true next build", {
     stdio: "inherit",
@@ -21,8 +38,14 @@ try {
   console.error("❌ App build error:", err);
   process.exit(1);
 } finally {
-  if (renamed && fs.existsSync(tempDir)) {
-    fs.renameSync(tempDir, apiDir);
-    console.log("🔄 Restored src/app/api directory for web server.");
+  for (const item of renamedFiles) {
+    if (fs.existsSync(item.backup)) {
+      try {
+        fs.renameSync(item.backup, item.original);
+      } catch (restoreErr) {
+        console.warn("Failed to restore", item.backup, restoreErr);
+      }
+    }
   }
+  console.log("🔄 Restored all API route files for web server.");
 }

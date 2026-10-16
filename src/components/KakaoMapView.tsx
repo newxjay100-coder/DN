@@ -105,11 +105,22 @@ export default function KakaoMapView({
     restaurants[0] ??
     null;
 
-  // 카카오 지도 SDK 로드 및 지도 인스턴스 초기화 (libraries=services,clusterer 포함)
+  // 카카오 지도 SDK 로드 및 지도 인스턴스 초기화
   const initKakaoMap = useCallback(() => {
     if (!isKeyConfigured) {
       setStatus("error");
       setErrorReason("missing_key");
+      return;
+    }
+
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.relayout();
+        mapInstanceRef.current.setCenter(
+          new window.kakao.maps.LatLng(centerCoords.lat, centerCoords.lng)
+        );
+        setStatus("ready");
+      } catch {}
       return;
     }
 
@@ -126,6 +137,8 @@ export default function KakaoMapView({
       window.kakao.maps.load(() => {
         if (!mapContainerRef.current) return;
         try {
+          if (mapInstanceRef.current) return;
+
           const initialTarget =
             restaurants.find((r) => r.id === focusedRestaurantId) ?? null;
           const initialLat = initialTarget
@@ -146,6 +159,16 @@ export default function KakaoMapView({
           );
           mapInstanceRef.current = map;
 
+          // 지도가 렌더링된 직후 컨테이너 크기 재계산 (0x0 크기 방지)
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.relayout();
+              mapInstanceRef.current.setCenter(
+                new window.kakao.maps.LatLng(initialLat, initialLng)
+              );
+            }
+          }, 100);
+
           // 지도 드래그 이벤트: 중심 이동 시 '이 위치에서 재검색' 버튼 노출
           window.kakao.maps.event.addListener(map, "dragend", () => {
             const center = map.getCenter();
@@ -154,65 +177,68 @@ export default function KakaoMapView({
           });
 
           setStatus("ready");
-        } catch {
+          setErrorReason(null);
+        } catch (err) {
+          console.error("카카오 지도 생성 예외:", err);
           setStatus("error");
           setErrorReason("sdk_load_failed");
         }
       });
     };
 
+    // 1) 이미 window.kakao.maps 가 로드되어 있는 경우 즉시 생성
     if (window.kakao && window.kakao.maps) {
       createMapInstance();
       return;
     }
 
-    const existingScript = document.getElementById(
-      KAKAO_SDK_SCRIPT_ID
-    ) as HTMLScriptElement | null;
-    if (existingScript) {
-      existingScript.remove();
+    // 2) 문서 헤드에 dapi.kakao.com 스크립트가 존재하는지 확인
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src*="dapi.kakao.com"]'
+    );
+
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = KAKAO_SDK_SCRIPT_ID;
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(
+        rawAppKey
+      )}&autoload=false&libraries=services,clusterer`;
+      script.async = true;
+
+      script.onload = () => {
+        createMapInstance();
+      };
+
+      script.onerror = () => {
+        setStatus("error");
+        setErrorReason("sdk_load_failed");
+      };
+
+      document.head.appendChild(script);
     }
 
-    // services, clusterer 라이브러리 추가 탑재 (정밀 역지오코딩 & 행정동 변환 지원)
-    const script = document.createElement("script");
-    script.id = KAKAO_SDK_SCRIPT_ID;
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(
-      rawAppKey
-    )}&autoload=false&libraries=services,clusterer`;
-    script.async = true;
+    // 3) 폴링을 통해 SDK 로드 대기 (최대 6초)
+    let pollCount = 0;
+    const interval = setInterval(() => {
+      pollCount++;
+      if (window.kakao && window.kakao.maps) {
+        clearInterval(interval);
+        createMapInstance();
+      } else if (pollCount > 30) {
+        clearInterval(interval);
+        if (status !== "ready") {
+          setStatus("error");
+          setErrorReason("sdk_load_failed");
+        }
+      }
+    }, 200);
 
-    script.onload = () => {
-      createMapInstance();
-    };
-
-    script.onerror = () => {
-      setStatus("error");
-      setErrorReason("sdk_load_failed");
-    };
-
-    document.head.appendChild(script);
-  }, [
-    isKeyConfigured,
-    rawAppKey,
-    centerCoords.lat,
-    centerCoords.lng,
-    focusedRestaurantId,
-    restaurants,
-    selectedRadius,
-  ]);
+    return () => clearInterval(interval);
+  }, [isKeyConfigured, rawAppKey]);
 
   useEffect(() => {
     initKakaoMap();
   }, [initKakaoMap]);
-
-  // 카카오 SDK 로딩 타임아웃 (1.5초 내 미로드 시 인터랙티브 타일 지도 자동 연동)
-  useEffect(() => {
-    if (status === "ready") return;
-    const timeout = setTimeout(() => {
-      setUseFallbackPreview(true);
-    }, 1500);
-    return () => clearTimeout(timeout);
-  }, [status]);
 
   // 기준 위치 및 반경 원 시각화
   useEffect(() => {
@@ -492,29 +518,63 @@ export default function KakaoMapView({
     map.setLevel(current + delta, { animate: true });
   };
 
-  // 카카오 지도 실패 또는 로딩 지연 시 실제 인터랙티브 타일 지도(리플릿)로 완벽 렌더링
+  // 카카오 지도 실패 또는 로딩 지연 시 안내 배너와 함께 인터랙티브 타일 지도(리플릿) 제공
   if (status === "error" || useFallbackPreview) {
     return (
-      <InteractiveLeafletMap
-        restaurants={restaurants}
-        centerCoords={centerCoords}
-        selectedRadius={selectedRadius}
-        locationMode={locationMode}
-        userGpsCoords={userGpsCoords}
-        isGeoLoading={isGeoLoading}
-        focusedRestaurantId={focusedRestaurantId}
-        focusTrigger={focusTrigger}
-        onRequestGeolocation={onRequestGeolocation}
-        onSelectRestaurantDetail={onSelectRestaurantDetail}
-        onFocusRestaurantMarker={onFocusRestaurantMarker}
-        onSearchAtCenter={onSearchAtCenter}
-        onRadiusChange={onRadiusChange}
-        onRetryKakao={() => {
-          setUseFallbackPreview(false);
-          initKakaoMap();
-        }}
-        isKakaoAvailable={isKeyConfigured}
-      />
+      <div className="space-y-3">
+        {status === "error" && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl text-xs text-amber-900 shadow-xs space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 font-bold text-amber-800">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>카카오 지도 도메인 등록 및 연결 안내</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUseFallbackPreview(false);
+                  initKakaoMap();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition cursor-pointer"
+              >
+                카카오 지도 다시 연결
+              </button>
+            </div>
+            <p className="leading-relaxed text-amber-800">
+              카카오 지도 JavaScript API는 보안 정책상 카카오 개발자 콘솔에 등록된 도메인에서만 지도를 표시합니다.
+            </p>
+            <div className="bg-white p-2.5 rounded-xl border border-amber-200 font-mono text-[11px] text-slate-800 flex items-center justify-between gap-2">
+              <span>
+                현재 접속 주소: <strong>{typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}</strong>
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-700">
+              👉 <strong>[developers.kakao.com] &gt; [내 애플리케이션] &gt; [플랫폼] &gt; [Web] &gt; [사이트 도메인]</strong>에 위 주소를 추가해 주시면 즉시 카카오 지도가 활성화됩니다.
+            </p>
+          </div>
+        )}
+
+        <InteractiveLeafletMap
+          restaurants={restaurants}
+          centerCoords={centerCoords}
+          selectedRadius={selectedRadius}
+          locationMode={locationMode}
+          userGpsCoords={userGpsCoords}
+          isGeoLoading={isGeoLoading}
+          focusedRestaurantId={focusedRestaurantId}
+          focusTrigger={focusTrigger}
+          onRequestGeolocation={onRequestGeolocation}
+          onSelectRestaurantDetail={onSelectRestaurantDetail}
+          onFocusRestaurantMarker={onFocusRestaurantMarker}
+          onSearchAtCenter={onSearchAtCenter}
+          onRadiusChange={onRadiusChange}
+          onRetryKakao={() => {
+            setUseFallbackPreview(false);
+            initKakaoMap();
+          }}
+          isKakaoAvailable={isKeyConfigured}
+        />
+      </div>
     );
   }
 
@@ -532,19 +592,38 @@ export default function KakaoMapView({
             (반경 내 {restaurants.length}곳)
           </span>
         </div>
-        <span className="text-slate-400 text-[11px]">
-          지도를 드래그하여 다른 동네로 이동할 수 있습니다
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-[11px] hidden sm:inline">
+            지도를 드래그하여 다른 동네로 이동할 수 있습니다
+          </span>
+          <button
+            type="button"
+            onClick={() => setUseFallbackPreview(true)}
+            className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-[11px] font-bold cursor-pointer"
+          >
+            오픈 타일 지도로 보기
+          </button>
+        </div>
       </div>
 
       {/* 지도 캔버스 및 로딩/안내 */}
       <div className="relative w-full min-h-[440px] sm:min-h-[500px] bg-slate-100 flex flex-col">
         <div
           ref={mapContainerRef}
-          className={`w-full h-[440px] sm:h-[500px] ${
-            status === "ready" ? "block" : "hidden"
-          }`}
+          className="w-full h-[440px] sm:h-[500px]"
         />
+
+        {status === "loading" && (
+          <div className="absolute inset-0 z-30 bg-slate-50/90 backdrop-blur-xs flex flex-col items-center justify-center p-8 text-center">
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
+            <p className="text-sm font-bold text-slate-800">
+              카카오 지도(Kakao Map)를 연결하고 있습니다...
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              실시간 GPS 및 위치 기반 마커를 준비하고 있습니다.
+            </p>
+          </div>
+        )}
 
         {/* 0. 지도 상단 플로팅 컨트롤: 탐색 반경 넓히기 & 즉시 전환 */}
         {status === "ready" && onRadiusChange && (
@@ -643,18 +722,6 @@ export default function KakaoMapView({
                 <Minus className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        )}
-
-        {status === "loading" && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
-            <p className="text-sm font-bold text-slate-800">
-              카카오 지도 SDK를 로드하고 있습니다...
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              실시간 GPS 및 위치 기반 마커를 준비하고 있습니다.
-            </p>
           </div>
         )}
       </div>
