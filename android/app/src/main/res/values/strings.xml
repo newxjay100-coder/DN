@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">동내 (DONGNAE)</string>
+    <string name="title_activity_main">동내 (DONGNAE)</string>
+    <string name="package_name">com.dongnae.app</string>
+    <string name="custom_url_scheme">com.dongnae.app</string>
+</resources>

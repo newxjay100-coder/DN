@@ -60,7 +60,11 @@ import {
   Sparkles,
   Star,
   Trophy,
+  WifiOff,
 } from "lucide-react";
+import { apiFetchRestaurants, apiFetchPublicData } from "@/lib/apiClient";
+import { getHybridCurrentPosition } from "@/utils/geolocationBridge";
+import { useNativeApp } from "@/hooks/useNativeApp";
 
 export default function HomePage() {
   // 1. 음식점 데이터 상태 (큐레이션 실데이터 + 공공데이터 실데이터)
@@ -137,6 +141,34 @@ export default function HomePage() {
   >(null);
   const [mapFocusTrigger, setMapFocusTrigger] = useState<number>(0);
 
+  // Capacitor 모바일 네이티브 수명주기, 안드로이드 뒤로가기, 오프라인 감지
+  const { isOnline } = useNativeApp({
+    onBackPress: () => {
+      // 1순위: 상세 모달 닫기
+      if (selectedRestaurant !== null) {
+        setSelectedRestaurant(null);
+        return true;
+      }
+      // 2순위: 주소 검색 모달 닫기
+      if (isAddressModalOpen) {
+        setIsAddressModalOpen(false);
+        return true;
+      }
+      // 3순위: 쿠폰 모달 닫기
+      if (activeCouponModal !== null) {
+        setActiveCouponModal(null);
+        return true;
+      }
+      // 4순위: 서브 탭에서 기본 'region'(맛집찾기) 탭으로 복귀
+      if (activeTab !== "region") {
+        setActiveTab("region");
+        return true;
+      }
+      // 5순위: 메인 화면에서는 false 반환 -> 앱 종료
+      return false;
+    },
+  });
+
   // 로컬 스토리지 초기화
   useEffect(() => {
     try {
@@ -188,28 +220,25 @@ export default function HomePage() {
     });
   };
 
-  // 음식점 데이터 로드 (Supabase DB에서 조회)
+  // 음식점 데이터 로드 (공통 API 클라이언트: Supabase DB 또는 로컬 Fallback)
   const fetchRestaurants = useCallback(async () => {
     try {
-      const res = await fetch("/api/restaurants");
-      if (res.ok) {
-        const json = await res.json();
-        if (json.restaurants && json.restaurants.length > 0) {
-          setBaseRestaurants(json.restaurants);
-          setDataSource(json.source || "default");
+      const res = await apiFetchRestaurants();
+      if (res.success && res.restaurants && res.restaurants.length > 0) {
+        setBaseRestaurants(res.restaurants);
+        setDataSource(res.source || "default");
 
-          // 저장 후 새로고침해도 DB에 보존된 공공데이터가 유지되도록 복원
-          const savedPublicRows = json.restaurants.filter(
-            (r: Restaurant) =>
-              r.dataOrigin === "public_data_sdsc" ||
-              r.dataOrigin === "public_data_gov"
+        // 저장 후 새로고침해도 DB에 보존된 공공데이터가 유지되도록 복원
+        const savedPublicRows = res.restaurants.filter(
+          (r: Restaurant) =>
+            r.dataOrigin === "public_data_sdsc" ||
+            r.dataOrigin === "public_data_gov"
+        );
+        if (savedPublicRows.length > 0) {
+          setPublicRestaurants((prev) =>
+            prev.length === 0 ? savedPublicRows.slice(0, 20) : prev
           );
-          if (savedPublicRows.length > 0) {
-            setPublicRestaurants((prev) =>
-              prev.length === 0 ? savedPublicRows.slice(0, 20) : prev
-            );
-            setPublicDataStatus("success");
-          }
+          setPublicDataStatus("success");
         }
       }
     } catch {
@@ -239,23 +268,29 @@ export default function HomePage() {
   // [PostGIS & DB 기준] 주변 음식점 서버/DB 실시간 검색 (거리 계산 & 정렬 서버/DB 수행)
   const fetchNearbyFromDb = useCallback(async () => {
     try {
-      const radiusParam = selectedRadius === "all" ? "all" : String(selectedRadius);
-      const catParam = selectedCategory !== "전체" ? `&category=${encodeURIComponent(selectedCategory)}` : "";
-      const searchParam = searchQuery.trim() ? `&search=${encodeURIComponent(searchQuery.trim())}` : "";
-      const url = `/api/restaurants?lat=${currentCenterCoords.lat}&lng=${currentCenterCoords.lng}&radius=${radiusParam}${catParam}${searchParam}&limit=60`;
+      const res = await apiFetchRestaurants({
+        lat: currentCenterCoords.lat,
+        lng: currentCenterCoords.lng,
+        radius: selectedRadius,
+        category: selectedCategory,
+        search: searchQuery.trim(),
+        limit: 60,
+      });
 
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.restaurants)) {
-          setBaseRestaurants(json.restaurants);
-          setDataSource(json.source || "supabase");
-        }
+      if (res.success && Array.isArray(res.restaurants)) {
+        setBaseRestaurants(res.restaurants);
+        setDataSource(res.source || "supabase");
       }
     } catch {
       // 오류 시 로컬 유지
     }
-  }, [currentCenterCoords.lat, currentCenterCoords.lng, selectedRadius, selectedCategory, searchQuery]);
+  }, [
+    currentCenterCoords.lat,
+    currentCenterCoords.lng,
+    selectedRadius,
+    selectedCategory,
+    searchQuery,
+  ]);
 
   useEffect(() => {
     fetchNearbyFromDb();
@@ -299,86 +334,49 @@ export default function HomePage() {
     setSearchQuery("");
   };
 
-  // 브라우저 위치 권한 요청 (고정밀 -> 일반 정밀도 2단계 안정적 조회 및 실시간 역지오코딩)
-  const handleRequestGeolocation = () => {
-    if (typeof window === "undefined" || !("geolocation" in navigator)) {
-      setGeoStatus("unsupported");
-      setLocationMode("manual_region");
-      setGeoErrorMessage(
-        "현재 브라우저에서 위치 정보(Geolocation) 기능을 지원하지 않습니다."
-      );
-      return;
-    }
-
+  // 하이브리드(웹 & 네이티브 앱) 위치 권한 요청 및 실시간 역지오코딩
+  const handleRequestGeolocation = async () => {
     setGeoStatus("loading");
     setGeoErrorMessage(null);
 
-    const tryLocate = (isHighAccuracy: boolean) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setUserGpsCoords(coords);
-          setGeoStatus("granted");
-          setLocationMode("geolocation");
-          setFocusedMapRestaurantId(null);
+    const result = await getHybridCurrentPosition();
 
-          // 실시간 카카오 지오코더 역지오코딩으로 정확한 도로명/동네 주소 산출
-          const geoInfo = await reverseGeocodeRealCoords(coords.lat, coords.lng);
-          setSelectedLocation({
-            title: geoInfo.dongName,
-            fullName: geoInfo.address,
-            lat: coords.lat,
-            lng: coords.lng,
-            description: `실시간 GPS 수신 위치 (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) · ${geoInfo.address}`,
-          });
-
-          // 내 주변 3km 이내 맛집 우선 표시 (원클릭 반경 변경 가능)
-          setSelectedRadius(3000);
-          setSearchQuery("");
-          setMapFocusTrigger((prev) => prev + 1);
-          fetchPublicData(coords.lat, coords.lng, 3000);
-        },
-        (error) => {
-          // 1차 고정밀 실패 시, 2차 일반 정밀도로 1회 자동 재시도 (데스크톱/노트북 타임아웃 방지)
-          if (
-            isHighAccuracy &&
-            (error.code === error.TIMEOUT ||
-              error.code === error.POSITION_UNAVAILABLE)
-          ) {
-            tryLocate(false);
-            return;
-          }
-
-          setLocationMode("manual_region");
-          if (error.code === error.PERMISSION_DENIED) {
-            setGeoStatus("denied");
-            setGeoErrorMessage(
-              "위치 권한이 거부되었습니다. 브라우저 주소창 좌측 자물쇠 아이콘에서 '위치 정보'를 [허용]으로 변경하시거나 아래에서 동네를 직접 선택해 주세요."
-            );
-          } else if (error.code === error.TIMEOUT) {
-            setGeoStatus("timeout");
-            setGeoErrorMessage(
-              "위치 확인 요청 시간이 초과되었습니다. 네트워크 연결 확인 후 다시 시도해 주세요."
-            );
-          } else {
-            setGeoStatus("unavailable");
-            setGeoErrorMessage(
-              "기기에서 위치 정보를 확인할 수 없습니다. 전국 동네를 직접 검색하거나 선택해 주세요."
-            );
-          }
-        },
-        {
-          enableHighAccuracy: isHighAccuracy,
-          timeout: isHighAccuracy ? 7000 : 12000,
-          maximumAge: 30000,
-        }
+    if (!result.success || !result.coords) {
+      setLocationMode("manual_region");
+      const status = result.errorReason || "unavailable";
+      setGeoStatus(status);
+      setGeoErrorMessage(
+        result.message ||
+          "기기에서 위치 정보를 확인할 수 없습니다. 동네를 직접 선택해 주세요."
       );
-    };
+      // 위치 권한 거부 시, 사용자가 바로 동네를 고를 수 있도록 주소 검색 모달 자동 활성화
+      if (status === "denied") {
+        setIsAddressModalOpen(true);
+      }
+      return;
+    }
 
-    tryLocate(true);
+    const coords = result.coords;
+    setUserGpsCoords(coords);
+    setGeoStatus("granted");
+    setLocationMode("geolocation");
+    setFocusedMapRestaurantId(null);
+
+    // 실시간 카카오 지오코더 역지오코딩으로 정확한 도로명/동네 주소 산출
+    const geoInfo = await reverseGeocodeRealCoords(coords.lat, coords.lng);
+    setSelectedLocation({
+      title: geoInfo.dongName,
+      fullName: geoInfo.address,
+      lat: coords.lat,
+      lng: coords.lng,
+      description: `실시간 GPS 수신 위치 (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}) · ${geoInfo.address}`,
+    });
+
+    // 내 주변 3km 이내 맛집 우선 표시 (원클릭 반경 변경 가능)
+    setSelectedRadius(3000);
+    setSearchQuery("");
+    setMapFocusTrigger((prev) => prev + 1);
+    fetchPublicData(coords.lat, coords.lng, 3000);
   };
 
   // 주소 검색 모달에서 지역을 선택했을 때
@@ -514,23 +512,24 @@ export default function HomePage() {
       setPublicDataStatus("loading");
       setPublicDataError(null);
       try {
-        const res = await fetch(
-          `/api/public-data?cx=${lng}&cy=${lat}&limit=50&radius=${radiusMeters}`
-        );
-        if (!res.ok) {
-          setPublicDataStatus("error");
-          setPublicDataError(`공공데이터 API 응답 오류 (HTTP ${res.status})`);
-          return;
-        }
-        const json = await res.json();
-        if (json.success && json.restaurants && json.restaurants.length > 0) {
-          setPublicRestaurants(json.restaurants);
+        const res = await apiFetchPublicData({
+          cx: lng,
+          cy: lat,
+          radius: radiusMeters,
+          limit: 50,
+        });
+
+        if (res.success && res.restaurants && res.restaurants.length > 0) {
+          setPublicRestaurants(res.restaurants);
           setPublicDataStatus("success");
           // DB 저장/갱신 완료 후 전체 DB 목록도 백그라운드 동기화
           fetchRestaurants();
-        } else {
+        } else if (res.success) {
           setPublicRestaurants([]);
           setPublicDataStatus("empty");
+        } else {
+          setPublicDataStatus("error");
+          setPublicDataError(res.error || "공공데이터 호출 실패");
         }
       } catch (err: unknown) {
         setPublicDataStatus("error");
@@ -721,6 +720,28 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
+      {/* 0. 네트워크 오프라인 알림 배너 */}
+      {!isOnline && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-xs sticky top-0 z-50">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4 shrink-0" />
+            <span>
+              네트워크에 연결되어 있지 않습니다. 로컬 캐시 데이터로 오프라인 실행 중입니다.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              fetchRestaurants();
+              fetchNearbyFromDb();
+            }}
+            className="px-2.5 py-1 rounded-lg bg-slate-950 text-white text-[11px] font-black hover:bg-slate-800 transition cursor-pointer"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
       {/* 1. 상단 서비스 상태 배너 */}
       <ServiceStatusBanner
         dataSource={dataSource}

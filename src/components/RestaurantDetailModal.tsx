@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { RestaurantWithDistance, UserReview } from "@/types/restaurant";
 import { formatDistance } from "@/utils/distance";
+import { apiFetchRestaurants } from "@/lib/apiClient";
+import { openKakaoRoute, openNaverRoute, openKakaoPlace } from "@/utils/externalLinks";
 import {
   Award,
   Building2,
@@ -47,15 +49,14 @@ export default function RestaurantDetailModal({
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [dbDetail, setDbDetail] = useState<Partial<RestaurantWithDistance> | null>(null);
 
-  // DB에서 음식점 최신 상세 정보 조회 (/api/restaurants?id=...)
+  // DB에서 음식점 최신 상세 정보 조회 (apiFetchRestaurants 활용)
   useEffect(() => {
     if (!restaurant?.id) return;
     setDbDetail(null);
-    fetch(`/api/restaurants?id=${encodeURIComponent(restaurant.id)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.restaurant) {
-          setDbDetail(json.restaurant);
+    apiFetchRestaurants({ id: restaurant.id })
+      .then((res) => {
+        if (res.success && res.restaurants && res.restaurants.length > 0) {
+          setDbDetail(res.restaurants[0]);
         }
       })
       .catch(() => {});
@@ -446,26 +447,36 @@ export default function RestaurantDetailModal({
             </div>
           </div>
 
-          {/* 4. 카카오 지도 / 길찾기 버튼 바 */}
+          {/* 4. 카카오 및 네이버 지도 길찾기 버튼 바 */}
           <div className="grid grid-cols-2 gap-2">
-            <a
-              href={kakaoRouteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() =>
+                openKakaoRoute({
+                  name: restaurant.name,
+                  lat: restaurant.lat,
+                  lng: restaurant.lng,
+                })
+              }
               className="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <Navigation className="w-3.5 h-3.5" />
               <span>카카오맵 길찾기</span>
-            </a>
-            <a
-              href={kakaoMapUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                openNaverRoute({
+                  name: restaurant.name,
+                  lat: restaurant.lat,
+                  lng: restaurant.lng,
+                })
+              }
+              className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
-              <span>카카오 지도 보기</span>
-            </a>
+              <ExternalLink className="w-3.5 h-3.5 text-white" />
+              <span>네이버 길찾기</span>
+            </button>
           </div>
 
           {/* 5. 방문자 리뷰 및 직접 작성 폼 */}
